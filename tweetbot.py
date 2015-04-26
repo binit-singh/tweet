@@ -20,7 +20,8 @@ auth.set_access_token(access_token, access_token_secret)
 api = tweepy.API(auth)
 response_csv_file = 'response.csv'
 handle_list = ['@VodafoneIN', '@airtel_presence', '@aircel', '@RelianceMobile', '@tatadocomo']
-
+loop_counter = 0
+replyed_user_list = []
 # sqlite db setup
 conn = sqlite3.connect('/home/binit/Projects/tweet/tweetDB.db')
 conn.text_factory = str
@@ -38,7 +39,6 @@ conn.commit()
 
 def processTweet(tweet):
 	# process the tweets
-
 	tweet = tweet.decode("utf-8")
 	#Convert to lower case
 	tweet = tweet.lower()
@@ -136,29 +136,39 @@ def reply_to_tweet(handle):
 	cur.execute('select tweet_id, tweet, user_name, followers_count from user_tweet where processed= 0 and replyed = 0')
 	collected_tweets = cur.fetchall()
 	reply_list = get_tweets_reply(collected_tweets, responses)
-
-	# Reply to user
-	for reply in reply_list:
-		reply_text = reply[0] + ' @' + reply[1]
+	try:
+		reply = reply_list[0]
+		msg = reply[0]
+		user = reply[1]
 		tweet_id = reply[2]
 
-		try:
-			# Post a status on twiiter
-			api.update_status(status=reply_text, in_reply_to_status_id = tweet_id)
-			print '='*40,'replyed', '='*40
-			# Update reply in table and make processed and replyed True
-			cur.execute("""UPDATE user_tweet SET reply = ? ,processed = ?, replyed = ? WHERE tweet_id= ? """,(reply_text, 1, 1,tweet_id))
-		except Exception as e:
-			print 'error', e
-			# Update status failed so only make processed True
-			cur.execute("""UPDATE user_tweet SET reply = ? ,processed = ? WHERE tweet_id= ? """,(reply_text, 1,tweet_id))
+		# Check if we have already replyed to user today
+		if user in replyed_user_list:
+			cur.execute('update user_tweet set processed= 1 and replyed = 1 where user_name = %s', user)
+			reply_to_tweet(handle)
+		else:
+			# Reply to user
+			reply_text = msg + ' @' + user
 
-		conn.commit()
+			try:
+				# Post a status on twiiter
+				api.update_status(status=reply_text, in_reply_to_status_id = tweet_id)
+				replyed_user_list.append(user)
+				print '='*40,'replyed', '='*40
+				# Update reply in table and make processed and replyed True
+				cur.execute("""UPDATE user_tweet SET reply = ? ,processed = ?, replyed = ? WHERE tweet_id= ? """,(reply_text, 1, 1,tweet_id))
+			except Exception as e:
+				print 'error', e
+				# Update status failed so only make processed True
+				cur.execute("""UPDATE user_tweet SET reply = ? ,processed = ? WHERE tweet_id= ? """,(reply_text, 1,tweet_id))
 
-# run this program till 12:00 AM
-while datetime.datetime.now().time() < datetime.time(23, 59, 00, 0000):
+			conn.commit()
+	except:
+		pass
+
+while loop_counter < 100:
+	loop_counter += 1
 	for handle in handle_list:
-		
 		reply_to_tweet(handle)
 		print '='*10, 'going to sleep'
 		time.sleep(60*10)
