@@ -19,7 +19,8 @@ auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
 api = tweepy.API(auth)
 response_csv_file = 'response.csv'
-handle_list = ['@VodafoneIN', '@airtel_presence', '@aircel', '@RelianceMobile', '@tatadocomo']
+handle_list = ['@VodafoneIN', '@airtel_presence', '@aircel', '@RelianceMobile', '@tatadocomo', '@flipkartsupport', '@ICICIBank_Care',
+'@HDFCBank_Cares', '@TheOfficialSBI', '@cromaretail', '@idea_cares', '@tatasky', '@snapdeal_help', '@jetairways']
 loop_counter = 0
 replyed_user_list = []
 # sqlite db setup
@@ -171,7 +172,7 @@ while loop_counter < 100:
 	for handle in handle_list:
 		reply_to_tweet(handle)
 		print '='*10, 'going to sleep'
-		time.sleep(60*10)
+		time.sleep(60*5)
 		print '===='*10, 'woke up', '='*40
 
 	
