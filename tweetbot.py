@@ -38,6 +38,14 @@ create_sql = '''
 cur.execute(create_sql)
 conn.commit()
 
+# Create table if not exist to store list of user's we have replied
+create_user_list_sql = '''
+				create table if not exists user_list
+				(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL , user_name text)
+			 '''
+cur.execute(create_user_list_sql)
+conn.commit()
+
 def processTweet(tweet):
 	# process the tweets
 	tweet = tweet.decode("utf-8")
@@ -129,13 +137,16 @@ def reply_to_tweet(handle):
 	chosse 1 best tweet we shold reply and reply it back. 
 	"""
 	# Collect tweets and store in db 
-	tweet_list = get_tweets(handle, 10)
+	tweet_list = get_tweets(handle, 100)
 	cur.executemany('INSERT INTO user_tweet (handle, tweet_id, user_name, followers_count, tweet) VALUES (?,?,?,?,?)', tweet_list)
 	conn.commit()
 
 	# Extract tweets from db and generate reply
 	cur.execute('select tweet_id, tweet, user_name, followers_count from user_tweet where processed= 0 and replyed = 0')
 	collected_tweets = cur.fetchall()
+	# Extract user list from db
+	cur.execute('select user_name from user_list')
+	replyed_user_list = cur.fetchall()
 	reply_list = get_tweets_reply(collected_tweets, responses)
 	try:
 		reply = reply_list[0]
@@ -154,12 +165,17 @@ def reply_to_tweet(handle):
 			try:
 				# Post a status on twiiter
 				api.update_status(status=reply_text, in_reply_to_status_id = tweet_id)
-				replyed_user_list.append(user)
+				a = 'INSERT INTO user_list (user_name) values ("%s")' % user
+				cur.execute(a)
+				conn.commit()
 				print '='*40,'replyed', '='*40
+				print datetime.datetime.now(), user, handle
+				print '='*80,
+
 				# Update reply in table and make processed and replyed True
 				cur.execute("""UPDATE user_tweet SET reply = ? ,processed = ?, replyed = ? WHERE tweet_id= ? """,(reply_text, 1, 1,tweet_id))
 			except Exception as e:
-				print 'error', e
+				print 'error as', e
 				# Update status failed so only make processed True
 				cur.execute("""UPDATE user_tweet SET reply = ? ,processed = ? WHERE tweet_id= ? """,(reply_text, 1,tweet_id))
 
@@ -167,13 +183,9 @@ def reply_to_tweet(handle):
 	except:
 		pass
 
-while loop_counter < 100:
-	loop_counter += 1
-	for handle in handle_list:
-		reply_to_tweet(handle)
-		print '='*10, 'going to sleep'
-		time.sleep(60*5)
-		print '===='*10, 'woke up', '='*40
+for handle in handle_list:
+	reply_to_tweet(handle)
+	time.sleep(60*2)
 
 	
 
